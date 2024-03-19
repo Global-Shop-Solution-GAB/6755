@@ -1,0 +1,382 @@
+﻿Program.Sub.ScreenSU.Start
+Gui.Form..Create(BaseForm)
+Gui.Form..Caption("Customer days to pay")
+Gui.Form..Size(1024,720)
+Gui.Form..MinX(0)
+Gui.Form..MinY(0)
+Gui.Form..Position(0,0)
+Gui.Form..AlwaysOnTop(False)
+Gui.Form..FontName("Tahoma")
+Gui.Form..FontSize(8.25)
+Gui.Form..ControlBox(True)
+Gui.Form..MaxButton(True)
+Gui.Form..MinButton(True)
+Gui.Form..MousePointer(0)
+Gui.Form..Moveable(True)
+Gui.Form..Sizeable(True)
+Gui.Form..ShowInTaskBar(True)
+Gui.Form..TitleBar(True)
+Gui.Form..Event(UnLoad,Form_UnLoad)
+Gui.Form.lbl1.Create(Label,"Start",True,28,16,0,3,5,True,0,"Tahoma",7.8,,0,0)
+Gui.Form.lbl1.BorderStyle(0)
+Gui.Form.lbl2.Create(Label,"End",True,21,16,0,135,3,True,0,"Tahoma",7.8,,0,0)
+Gui.Form.lbl2.BorderStyle(0)
+Gui.Form.dtpStart.Create(DatePicker)
+Gui.Form.dtpStart.Enabled(True)
+Gui.Form.dtpStart.Visible(True)
+Gui.Form.dtpStart.Zorder(0)
+Gui.Form.dtpStart.Size(125,22)
+Gui.Form.dtpStart.Position(4,20)
+Gui.Form.dtpStart.CheckBox(False)
+Gui.Form.dtpStart.FontName("Tahoma")
+Gui.Form.dtpStart.FontSize(7.8)
+Gui.Form.dtpEnd.Create(DatePicker)
+Gui.Form.dtpEnd.Enabled(True)
+Gui.Form.dtpEnd.Visible(True)
+Gui.Form.dtpEnd.Zorder(0)
+Gui.Form.dtpEnd.Size(125,22)
+Gui.Form.dtpEnd.Position(135,20)
+Gui.Form.dtpEnd.CheckBox(False)
+Gui.Form.dtpEnd.FontName("Tahoma")
+Gui.Form.dtpEnd.FontSize(7.8)
+Gui.Form.cmdRefresh.Create(Button)
+Gui.Form.cmdRefresh.Enabled(True)
+Gui.Form.cmdRefresh.Visible(True)
+Gui.Form.cmdRefresh.Zorder(0)
+Gui.Form.cmdRefresh.Size(16,18)
+Gui.Form.cmdRefresh.Position(266,20)
+Gui.Form.cmdRefresh.Caption("Refresh")
+Gui.Form.cmdRefresh.FontName("Tahoma")
+Gui.Form.cmdRefresh.FontSize(7.8)
+Gui.Form.cmdRefresh.Event(Click,cmdRefresh_Click)
+Gui.Form.GSGC_Cust_DaysToPay.Create(GsGridControl)
+Gui.Form.GSGC_Cust_DaysToPay.Enabled(True)
+Gui.Form.GSGC_Cust_DaysToPay.Visible(True)
+Gui.Form.GSGC_Cust_DaysToPay.Zorder(0)
+Gui.Form.GSGC_Cust_DaysToPay.Size(1016,634)
+Gui.Form.GSGC_Cust_DaysToPay.Position(5,45)
+Gui.Form.GSGC_Cust_DaysToPay.Anchor(15)
+Gui.Form.GSGC_Cust_DaysToPay.Event(RowCellClick,GSGC_Cust_DaysToPay_RowCellClick)
+Program.Sub.ScreenSU.End
+
+Program.Sub.Preflight.Start
+Program.Sub.Preflight.End
+Program.Sub.Main.Start
+Function.Intrinsic.UI.UsePixels ' Allows you to use Pixels instead of Twips throughout
+'Bryan Pham
+'CHE110-11320221021-0
+'Customer: CHEMUNG SUPPLY CORPORATION
+'Scope: dashboard for FOR 'CUSTOMER AVE DAYS TO PAY' 
+
+F.Intrinsic.Control.Try
+V.Local.sError.Declare
+f.ODBC.Connection!con.OpenCompanyConnection
+f.Intrinsic.Control.CallSub(setContextMenus)
+
+gui.Form..Show
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.String.Build("Project: {0}{1}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}{1}GAB Version: {5}",V.Ambient.ScriptPath,V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Ambient.GABVersion,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	f.Intrinsic.Control.End
+F.Intrinsic.Control.EndTry
+Program.Sub.Main.End
+
+Program.Sub.cmdRefresh_Click.Start
+F.Intrinsic.Control.Try
+V.Local.sError.Declare
+v.Local.sSQL.Declare
+v.Local.dStart.Declare
+v.Local.dEnd.Declare
+v.Local.iCnt.Declare
+v.Local.sPayDate.Declare
+v.Local.sFilter.Declare
+v.Local.fAvgPayDays.Declare
+v.Local.sCustList.Declare
+
+f.Intrinsic.UI.InvokeWaitDialog("Loading data...","Please wait")
+f.Intrinsic.Control.If(v.DataTable.dtDaysToPay.Exists,=,True)
+	f.Data.Datatable.Close("dtDaysToPay")
+f.Intrinsic.Control.EndIf
+
+f.Intrinsic.Control.If(v.DataTable.dtCurDaysToPay.Exists,=,True)
+	f.Data.Datatable.Close("dtCurDaysToPay")
+f.Intrinsic.Control.EndIf
+
+v.Local.dStart.Set(v.Screen.Form!dtpStart.Value)
+v.Local.dEnd.Set(v.Screen.Form!dtpEnd.Value)
+'load all invoices from history based off the date range
+f.Intrinsic.String.Build("Select RTRIM(CUSTOMER) as CUSTOMER, '' as CUST_NAME, sum(date_transaction - date_invoice)/count(customer) as Hist_Ave_Days_To_Pay, cast(0 as float) as Open_Ave_Days_To_Pay, cast(0 as float) as Tot_Balance, cast(0 as float)  as Tot_Value_Hist_Invoices from V_AR_HISTORY where DATE_INVOICE between '{0}' and '{1}' and BATCH_CODE = '11' group by CUSTOMER,CUST_NAME,Open_Ave_Days_To_Pay,Tot_Balance;",v.Local.dStart.PervasiveDate,v.Local.dEnd.PervasiveDate,v.Local.sSQL)
+f.Data.Datatable.CreateFromSQL("dtDaysToPay","con",v.Local.sSQL,True)
+
+f.Data.Datatable.AddColumn("dtDaysToPay","Last_Cash_Receipt_Date","Date")
+
+'fill customer name
+f.Data.Dictionary.CreateFromSQL("dictCust","con","Select RTRIM(CUSTOMER),RTRIM(NAME_CUSTOMER) from V_CUSTOMER_MASTER")
+f.Data.Dictionary.SetDefaultReturn("dictCust","")
+f.Data.Datatable.FillFromDictionary("dtDaysToPay","dictCust","CUSTOMER","CUST_NAME")
+f.Data.Dictionary.Close("dictCust")
+
+'fill total balance of open items
+f.Data.Dictionary.CreateFromSQL("dictTotBal","con","select rtrim(customer), SUM(amt_invoice) from V_AR_OPEN_ITEMS GROUP by customer;")
+f.Data.Dictionary.SetDefaultReturn("dictTotBal",0)
+f.Data.Datatable.FillFromDictionary("dtDaysToPay","dictTotBal","CUSTOMER","Tot_Balance")
+f.Data.Dictionary.Close("dictTotBal")
+
+'fill total hist invoices amount without tax
+f.Intrinsic.String.Build("select rtrim(customer), SUM(AMT_INVOICE - TAX_AMT_CO_CURR) from V_AR_HISTORY where BATCH_CODE = '10' and DATE_INVOICE between '{0}' and '{1}' GROUP by customer ;",v.Local.dStart.PervasiveDate,v.Local.dEnd.PervasiveDate,v.Local.sSQL)
+f.Data.Dictionary.CreateFromSQL("dictTotHistInv","con",v.Local.sSQL)
+f.Data.Dictionary.SetDefaultReturn("dictTotHistInv",0)
+f.Data.Datatable.FillFromDictionary("dtDaysToPay","dictTotHistInv","CUSTOMER","Tot_Value_Hist_Invoices")
+f.Data.Dictionary.Close("dictTotHistInv")
+
+'calculate days to pay for open items
+f.Intrinsic.Control.If(v.DataTable.dtDaysToPay.RowCount,>,0)
+	'get a list of customers in the dashboard - this helps to reduce the load time
+	f.Data.DataView.Create("dtDaysToPay","dvDaysToPay")
+	f.Data.DataView.ToString("dtDaysToPay","dvDaysToPay","CUSTOMER","","%$#",v.Local.sCustList)
+	f.Intrinsic.String.Replace(v.Local.sCustList,"'","''",v.Local.sCustList)
+	f.Intrinsic.String.Replace(v.Local.sCustList,"%$#","','",v.Local.sCustList)	
+	F.Intrinsic.String.Build("Select distinct RTRIM(CUSTOMER) as CUSTOMER, INVOICE,DATE_INVOICE from V_AR_OPEN_ITEMS where BATCH_CODE = '11' and CUSTOMER in ('{0}')", v.Local.sCustList, V.Local.sSQL)
+
+	f.Data.Datatable.CreateFromSQL("dtCurDaysToPay","con", V.Local.sSQL,True)
+	f.Data.Datatable.AddColumn("dtCurDaysToPay","No_Trans","Float")
+	f.Data.Datatable.AddColumn("dtCurDaysToPay","PayDays","Float")
+	
+	'now we need to loop thru open items and get the latest pay date - date invoice
+	f.Intrinsic.Control.For(v.Local.iCnt,0,v.DataTable.dtCurDaysToPay.RowCount--,1)
+		f.Intrinsic.UI.ChangeWaitStatus("Loading days to pay for open items...",v.Local.iCnt,0,v.DataTable.dtCurDaysToPay.RowCount--)
+		
+		f.Intrinsic.String.Build("Select TOP 1 (DATE_TRANSACTION-DATE_INVOICE) from V_AR_OPEN_ITEMS where CUSTOMER = '{0}' and INVOICE = '{1}' and BATCH_CODE = '11' group by DATE_TRANSACTION,DATE_INVOICE order by DATE_TRANSACTION,DATE_INVOICE desc",v.DataTable.dtCurDaysToPay(v.Local.iCnt).CUSTOMER!FieldValTrim,v.DataTable.dtCurDaysToPay(v.Local.iCnt).INVOICE!FieldValTrim,v.Local.sSQL)
+		f.ODBC.Connection!con.ExecuteAndReturn(v.Local.sSQL,v.Local.sPayDate)
+		f.Intrinsic.Control.If(v.Ambient.ExecuteAndReturnEOF,=,False)
+			f.Data.Datatable.SetValue("dtCurDaysToPay",v.Local.iCnt,"PayDays",v.Local.sPayDate)
+		f.Intrinsic.Control.EndIf
+	'get the number of transaction to later calculate the average days to pay
+		f.Intrinsic.String.Build("Select count(CUSTOMER) from V_AR_OPEN_ITEMS where CUSTOMER = '{0}' and BATCH_CODE = '11'",v.DataTable.dtCurDaysToPay(v.Local.iCnt).CUSTOMER!FieldValTrim,v.Local.sSQL)
+		f.ODBC.Connection!con.ExecuteAndReturn(v.Local.sSQL,v.Local.sPayDate)
+		f.Intrinsic.Control.If(v.Ambient.ExecuteAndReturnEOF,=,False)
+			f.Data.Datatable.SetValue("dtCurDaysToPay",v.Local.iCnt,"No_Trans",v.Local.sPayDate)
+		f.Intrinsic.Control.EndIf
+	f.Intrinsic.Control.Next(v.Local.iCnt)
+	'calculate avg days to pay
+	f.Data.Datatable.AddExpressionColumn("dtCurDaysToPay","AvePayDays","Float","[PayDays]/[No_Trans]")
+	
+	'create a DT that is used for creating dictionay 
+	F.Data.Linq.Join(V.Enum.LinqJoinType!LeftJoin,V.Enum.LinqSourceType!DataTable,"dtCurDaysToPay*!*A",V.Enum.LinqSourceType!DataTable,"dtCurDaysToPay*!*B","A.CUSTOMER = B.CUSTOMER and A.INVOICE = B.INVOICE","A.CUSTOMER*!*sum(A.AvePayDays) as Open_AvePayDays","","A.CUSTOMER","","dtFinal",True)
+	'create dict from DT and fill in the main DT
+	f.Data.Dictionary.CreateFromDatatable("dictOpenDaysPay","dtFinal","CUSTOMER","Open_AvePayDays")
+	f.Data.Dictionary.SetDefaultReturn("dictOpenDaysPay",0)
+	f.Data.Datatable.FillFromDictionary("dtDaysToPay","dictOpenDaysPay","CUSTOMER","Open_Ave_Days_To_Pay")
+	f.Data.Dictionary.Close("dictOpenDaysPay")
+f.Intrinsic.Control.EndIf
+
+'load most recent cash receipt date
+f.Intrinsic.Control.For(v.Local.iCnt,0,v.DataTable.dtDaysToPay.RowCount--,1)
+	f.Intrinsic.UI.ChangeWaitStatus("Loading last cash receipt date...",v.Local.iCnt,0,v.DataTable.dtDaysToPay.RowCount--)
+	f.Intrinsic.String.Build("Select TOP 1 DATE_TRANSACTION from V_AR_OPEN_ITEMS where CUSTOMER = '{0}' order by DATE_TRANSACTION desc",v.DataTable.dtDaysToPay(v.Local.iCnt).CUSTOMER!FieldValTrim,v.Local.sSQL)
+	f.ODBC.Connection!con.ExecuteAndReturn(v.Local.sSQL,v.Local.sPayDate)
+	f.Intrinsic.Control.If(v.Ambient.ExecuteAndReturnEOF,=,False)
+		f.Data.Datatable.SetValue("dtDaysToPay",v.Local.iCnt,"Last_Cash_Receipt_Date",v.Local.sPayDate)
+	f.Intrinsic.Control.EndIf
+f.Intrinsic.Control.Next(v.Local.iCnt)
+
+f.Intrinsic.Control.CallSub(loadGVDaysToPay)
+f.Intrinsic.UI.CloseWaitDialog
+F.Intrinsic.Control.Catch
+	F.Intrinsic.String.Build("Project: {0}{1}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}{1}GAB Version: {5}",V.Ambient.ScriptPath,V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Ambient.GABVersion,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	f.Intrinsic.Control.End
+F.Intrinsic.Control.EndTry
+Program.Sub.cmdRefresh_Click.End
+
+Program.Sub.GSGC_Cust_DaysToPay_RowCellClick.Start
+F.Intrinsic.Control.Try
+V.Local.sError.Declare
+v.Local.sParams.Declare
+v.Local.sCust.Declare
+v.Local.bEdit.Declare
+
+'open Customer Master screen
+F.Intrinsic.Control.SelectCase(V.Args.Column)
+	F.Intrinsic.Control.CaseAny("CUSTOMER","Customer","CUST_NAME","Cust_Name")
+		Gui.Form.GSGC_Cust_DaysToPay.GetCellValueByColumnName("gvDaysToPay","CUSTOMER",V.Args.RowIndex,V.Local.sCust)
+		Function.Global.Security.CheckUserAccessIPM(371,0,v.Local.bEdit)
+		f.Intrinsic.Control.If(v.Local.bEdit)
+			F.Intrinsic.String.ConcatCallWrapperArgs("E","",v.Local.sCust,V.Local.sParams)
+		f.Intrinsic.Control.Else
+			F.Intrinsic.String.ConcatCallWrapperArgs("O","",v.Local.sCust,V.Local.sParams)
+		f.Intrinsic.Control.EndIf
+		f.Global.General.CallWrapperSync(100000, v.Local.sParams)
+F.Intrinsic.Control.EndSelect
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.String.Build("Project: {0}{1}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}{1}GAB Version: {5}",V.Ambient.ScriptPath,V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Ambient.GABVersion,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	f.Intrinsic.Control.End
+F.Intrinsic.Control.EndTry
+Program.Sub.GSGC_Cust_DaysToPay_RowCellClick.End
+
+Program.Sub.Form_UnLoad.Start
+F.Intrinsic.Control.Try
+V.Local.sError.Declare
+
+f.ODBC.Connection!con.Close
+f.Intrinsic.Control.End
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.String.Build("Project: {0}{1}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}{1}GAB Version: {5}",V.Ambient.ScriptPath,V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Ambient.GABVersion,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	f.Intrinsic.Control.End
+F.Intrinsic.Control.EndTry
+Program.Sub.Form_UnLoad.End
+
+Program.Sub.loadGVDaysToPay.Start
+F.Intrinsic.Control.Try
+V.Local.sError.Declare
+Gui.Form.GSGC_Cust_DaysToPay.AddGridviewFromDataTable("gvDaysToPay","dtDaysToPay")
+Gui.Form.GSGC_Cust_DaysToPay.SuspendLayout()
+
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","CUSTOMER","Caption","Customer No.")
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","CUSTOMER","HeaderFontBold",True)
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","CUSTOMER","HeaderHAlignment","Center")
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","CUSTOMER","MinWidth",50)
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","CUSTOMER","CellHAlignment","Center")	
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","CUSTOMER","AllowEdit",False)
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","CUSTOMER","AllowSort",True)
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","CUSTOMER","ReadOnly",True)
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","CUSTOMER","CellForeColor",V.Enum.ThemeColors!AccentColor)
+
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","CUST_NAME","Caption","Customer Name")
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","CUST_NAME","HeaderFontBold",True)
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","CUST_NAME","HeaderHAlignment","Center")
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","CUST_NAME","MinWidth",120)
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","CUST_NAME","CellHAlignment","Center")	
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","CUST_NAME","AllowEdit",False)
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","CUST_NAME","AllowSort",True)
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","CUST_NAME","ReadOnly",True)
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","CUST_NAME","CellForeColor",V.Enum.ThemeColors!AccentColor)
+
+
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","Hist_Ave_Days_To_Pay","Caption","Hist. Ave. Days To Pay")
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","Hist_Ave_Days_To_Pay","HeaderFontBold",True)
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","Hist_Ave_Days_To_Pay","HeaderHAlignment","Center")
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","Hist_Ave_Days_To_Pay","MinWidth",120)
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","Hist_Ave_Days_To_Pay","CellHAlignment","Center")	
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","Hist_Ave_Days_To_Pay","AllowEdit",False)
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","Hist_Ave_Days_To_Pay","AllowSort",True)
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","Hist_Ave_Days_To_Pay","ReadOnly",True)
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","Hist_Ave_Days_To_Pay","DisplayCustomNumeric","#,###,###,####")
+
+
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","Open_Ave_Days_To_Pay","Caption","Open Ave. Days To Pay")
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","Open_Ave_Days_To_Pay","HeaderFontBold",True)
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","Open_Ave_Days_To_Pay","HeaderHAlignment","Center")
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","Open_Ave_Days_To_Pay","MinWidth",120)
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","Open_Ave_Days_To_Pay","CellHAlignment","Center")	
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","Open_Ave_Days_To_Pay","AllowEdit",False)
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","Open_Ave_Days_To_Pay","AllowSort",True)
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","Open_Ave_Days_To_Pay","ReadOnly",True)
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","Open_Ave_Days_To_Pay","DisplayCustomNumeric","#,###,###,####")
+
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","Tot_Balance","Caption","Total Balance")
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","Tot_Balance","HeaderFontBold",True)
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","Tot_Balance","HeaderHAlignment","Center")
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","Tot_Balance","MinWidth",120)
+'Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","Tot_Balance","CellHAlignment","Center")	
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","Tot_Balance","AllowEdit",False)
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","Tot_Balance","AllowSort",True)
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","Tot_Balance","ReadOnly",True)
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","Tot_Balance","DisplayCustomNumeric","#,###,###,##0.00##")
+
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","Last_Cash_Receipt_Date","Caption","Last Cash Receipt Date")
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","Last_Cash_Receipt_Date","HeaderFontBold",True)
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","Last_Cash_Receipt_Date","HeaderHAlignment","Center")
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","Last_Cash_Receipt_Date","MinWidth",120)
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","Last_Cash_Receipt_Date","CellHAlignment","Center")	
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","Last_Cash_Receipt_Date","AllowEdit",False)
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","Last_Cash_Receipt_Date","AllowSort",True)
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","Last_Cash_Receipt_Date","ReadOnly",True)
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","Last_Cash_Receipt_Date","DisplayCustomDatetime","d")
+
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","Tot_Value_Hist_Invoices","Caption","Total Amt. Hist Invoices")
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","Tot_Value_Hist_Invoices","HeaderFontBold",True)
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","Tot_Value_Hist_Invoices","HeaderHAlignment","Center")
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","Tot_Value_Hist_Invoices","MinWidth",120)
+'Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","Tot_Value_Hist_Invoices","CellHAlignment","Center")	
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","Tot_Value_Hist_Invoices","AllowEdit",False)
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","Tot_Value_Hist_Invoices","AllowSort",True)
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","Tot_Value_Hist_Invoices","ReadOnly",True)
+Gui.Form.GSGC_Cust_DaysToPay.SetColumnProperty("gvDaysToPay","Tot_Value_Hist_Invoices","DisplayCustomNumeric","#,###,###,##0.00##")
+
+Gui.Form.GSGC_Cust_DaysToPay.AddSummaryItem("gvDaysToPay","Tot_Balance","Tot_Balance","Sum","","","n")
+Gui.Form.GSGC_Cust_DaysToPay.AddSummaryItem("gvDaysToPay","Tot_Value_Hist_Invoices","Tot_Value_Hist_Invoices","Sum","","","n")
+
+
+Gui.Form.GSGC_Cust_DaysToPay.ResumeLayout()
+Gui.Form.GSGC_Cust_DaysToPay.MainView("gvDaysToPay")
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.String.Build("Project: {0}{1}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}{1}GAB Version: {5}",V.Ambient.ScriptPath,V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Ambient.GABVersion,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	f.Intrinsic.Control.End
+F.Intrinsic.Control.EndTry
+Program.Sub.loadGVDaysToPay.End
+
+Program.Sub.setContextMenus.Start
+F.Intrinsic.Control.Try
+V.Local.sError.Declare
+
+'Grid Purchase To Stock
+Gui.Form..ContextMenuCreate("ctxDaysToPay")
+Gui.Form.GSGC_Cust_DaysToPay.ContextMenuAttach("ctxDaysToPay")
+Gui.Form..ContextMenuAddItem("ctxDaysToPay","Refresh",0,"Refresh")
+Gui.Form..ContextMenuAddItem("ctxDaysToPay","Export",0,"Export")
+
+Gui.Form..ContextMenuSetItemEventHandler("ctxDaysToPay","Refresh","cmdRefresh_Click")
+Gui.Form..ContextMenuSetItemEventHandler("ctxDaysToPay","Export","MenuClickExport")
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.String.Build("Project: {0}{1}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}{1}GAB Version: {5}",V.Ambient.ScriptPath,V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Ambient.GABVersion,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	f.Intrinsic.Control.End
+F.Intrinsic.Control.EndTry
+Program.Sub.setContextMenus.End
+
+Program.Sub.MenuClickExport.Start
+F.Intrinsic.Control.Try
+V.Local.sError.Declare
+V.Local.bExcel.Declare
+V.Local.sExt.Declare
+V.Local.sFileExport.Declare
+V.Local.bFileLocked.Declare
+V.Local.sMsg.Declare
+
+	F.Automation.MSExcel.CheckPresence(V.Local.bExcel)
+	F.Intrinsic.Control.If(V.Local.bExcel)
+		V.Local.sExt.Set("xlsx")
+	F.Intrinsic.Control.Else
+		V.Local.sExt.Set("csv")
+	F.Intrinsic.Control.EndIf
+	
+	F.Intrinsic.String.Build("{0}\GCG_6755_Customer_Days_To_Pay_Export.{1}",V.Caller.LocalGssTempDir,V.Local.sExt,V.Local.sFileExport)
+	F.Intrinsic.File.IsFileLocked(V.Local.sFileExport,V.Local.bFileLocked)
+	F.Intrinsic.Control.If(V.Local.bFileLocked)
+		F.Intrinsic.String.Build("File is already open. Please close and export again.{0}File: {1}",V.Ambient.NewLine,V.Local.sFileExport,V.Local.sMsg)
+		F.Intrinsic.UI.Msgbox(V.Local.sMsg,"File In Use")
+	F.Intrinsic.Control.Else
+		Gui.Form.GSGC_Cust_DaysToPay.Export(V.Local.sFileExport,V.Local.sExt)
+		F.Intrinsic.Task.ShellExec(0,"",V.Local.sFileExport,"","",1)
+	F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.String.Build("Project: {0}{1}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}{1}GAB Version: {5}",V.Ambient.ScriptPath,V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Ambient.GABVersion,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	f.Intrinsic.Control.End
+F.Intrinsic.Control.EndTry
+Program.Sub.MenuClickExport.End
+
+Program.Sub.Comments.Start
+${$5$}$3.0.0.0$}$1
+${$6$}$bpham$}$20220524103715312$}$Di0riF4Q5RIv6jxva5zSWBaTvp+T0Dt6uUYnvGTxbwTy/sdIAoqoULQurfwKO0H1lkyZMqiFdAs=
+Program.Sub.Comments.End
